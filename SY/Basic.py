@@ -1,27 +1,20 @@
-#ques 1
 print("Hello, World!")
 
-#ques 2
 a=int(input("Enter first number:"))
 b=int(input("Enter second number:"))
 print("The sum of the code is",a+b)
 
-#ques 8
 num=int(input("Enter the number"))
 sq=(num*num)
 cube= (num*num*num)
 print("The square of the number is",sq,"and the cube is", cube)
 
-#Conditional statements 
-
-#ques 12
 year=int(input("Enter the year to be checked:"))
 if year%4==0:
     print("It is leap year")
 else:
     print("It is not the leap year")
     
-#ques 13
 marks=int(input("Enter your marks:"))
 if marks>=91:
     print("your grade is O")
@@ -42,8 +35,6 @@ elif marks>=21:
 else:
     print("You are FAIL")
           
-          
-#ques 14
 vwls=[a,e,i,o,u,]
 word=input("Enter the word:")
 if f[0] in word == vwls[0][1][2][3][4]:

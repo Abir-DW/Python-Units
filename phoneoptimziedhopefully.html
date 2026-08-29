@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Filmmaking & Photography Assistant</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Marked for Markdown Parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            900: '#18181b',
+                            950: '#09090b',
+                        },
+                        cinematic: {
+                            amber: '#f59e0b',
+                            red: '#ef4444',
+                            border: '#27272a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+                        typewriter: ['"Courier New"', 'Courier', 'monospace'],
+                    },
+                    letterSpacing: {
+                        widest: '.25em',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-color: #09090b;
+            --card-bg: #121215;
+            --text-color: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --border-color: #27272a;
+            --viewfinder-color: #52525b;
+        }
+
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+        }
+        
+        /* Markdown High-Contrast Legibility Styles */
+        .prose { color: var(--text-color); max-width: none; }
+        .prose h1, .prose h2, .prose h3 { font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; text-transform: uppercase; letter-spacing: 0.05em; color: #ffffff; }
+        .prose h2 { font-size: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+        
+        .prose p { margin-bottom: 1em; line-height: 1.7; color: var(--text-muted); }
+        .prose strong { font-weight: 700; color: #ffffff; }
+        
+        .prose ul { list-style-type: square; padding-left: 1.5em; margin-bottom: 1em; color: var(--text-muted); }
+        .prose li { margin-bottom: 0.35em; color: var(--text-muted); }
+        .prose li::marker { color: #f59e0b; }
+        
+        .prose code { padding: 0.2em 0.4em; border-radius: 4px; font-family: monospace; font-size: 0.9em; border: 1px solid var(--border-color); background-color: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        
+        .prose hr { border-color: var(--border-color); margin: 2em 0; }
+        .prose img { max-width: 100%; border-radius: 4px; margin: 1em 0; border: 1px solid var(--border-color); }
+        .prose a { color: #f59e0b; text-decoration: underline; text-underline-offset: 4px; font-weight: 500; transition: color 0.2s;}
+        .prose a:hover { color: #d97706; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+        /* Cinematic Gradients & Grain */
+        .film-grain {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 50; opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+        
+        /* Viewfinder Brackets */
+        .viewfinder-tl { border-top: 2px solid var(--viewfinder-color); border-left: 2px solid var(--viewfinder-color); width: 16px; height: 16px; position: absolute; top: 0; left: 0; transition: border-color 0.3s; }
+        .viewfinder-tr { border-top: 2px solid var(--viewfinder-color); border-right: 2px solid var(--viewfinder-color); width: 16px; height: 16px; position: absolute; top: 0; right: 0; transition: border-color 0.3s; }
+        .viewfinder-bl { border-bottom: 2px solid var(--viewfinder-color); border-left: 2px solid var(--viewfinder-color); width: 16px; height: 16px; position: absolute; bottom: 0; left: 0; transition: border-color 0.3s; }
+        .viewfinder-br { border-bottom: 2px solid var(--viewfinder-color); border-right: 2px solid var(--viewfinder-color); width: 16px; height: 16px; position: absolute; bottom: 0; right: 0; transition: border-color 0.3s; }
+
+        @media (max-width: 767px) {
+            .prose { overflow-wrap: anywhere; }
+            select, input, textarea, button { max-width: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-[#09090b] text-[#f4f4f5]">
+    <div class="film-grain"></div>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const apiKey = "AQ.Ab8RN6IhCiu5-4XMm-rmWXrY5uljMwb4Z6SDY64i7kGLW65D4Q"; 
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent";
+        
+        const PERSONA = `You are an elite, experienced cinematographer, photographer, and gear advisor based in India. 
+You speak to filmmakers and visual storytellers. You are practical, brutally honest, and technically precise. 
+You do NOT sugarcoat. You do NOT use generic AI chatbot language.
+When recommending gear, strictly prioritize practical, accessible consumer and prosumer brands (such as Sony, Canon, Nikon, Fujifilm, Sigma, Tamron, DJI) within realistic indie budgets. Avoid suggesting ultra-luxury cinema gear like Arri, RED, or Cooke unless specifically asked for high-end studio tiers.
+You understand the realities of indie budgets, the Indian market (use INR ₹), and various Indian cinema industries.
+Format your responses using clean Markdown.`;
+
+        const MAX_REQUESTS_PER_MINUTE = 15;
+
+        const Icons = {
+            Camera: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>,
+            Video: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+            Crosshair: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg>,
+            Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+            User: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+            Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+            Zap: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        };
+
+        const CinematicButton = ({ children, onClick, variant = 'primary', className = '', type = 'button', disabled=false }) => {
+            const baseStyle = "px-6 py-3 font-mono text-sm tracking-widest uppercase transition-all duration-300 relative group overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed shadow-sm";
+            const variants = {
+                primary: "bg-zinc-100 text-zinc-950 hover:bg-white font-bold border border-zinc-100",
+                outline: "border border-zinc-700 text-zinc-200 hover:border-cinematic-amber hover:text-cinematic-amber bg-zinc-900/80 font-medium",
+                danger: "border border-red-900 text-red-400 hover:border-cinematic-red hover:text-cinematic-red bg-zinc-900/80 font-medium",
+            };
+            
+            return (
+                <button type={type} onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`} disabled={disabled}>
+                    <span className="relative z-10 flex items-center justify-center gap-2">{children}</span>
+                </button>
+            );
+        };
+
+        const ViewfinderCard = ({ children, className = '' }) => (
+            <div className={`relative bg-[#121215] border border-[#27272a] p-8 shadow-sm transition-colors duration-300 ${className}`}>
+                <div className="viewfinder-tl"></div>
+                <div className="viewfinder-tr"></div>
+                <div className="viewfinder-bl"></div>
+                <div className="viewfinder-br"></div>
+                {children}
+            </div>
+        );
+
+        const Input = ({ label, type = "text", value, onChange, placeholder, className = "", as = "input", options=[] }) => {
+            const baseClass = "w-full bg-[#18181b] border border-zinc-700 p-3 text-zinc-100 font-sans focus:outline-none focus:border-cinematic-amber focus:ring-1 focus:ring-cinematic-amber transition-colors placeholder:text-zinc-500 rounded-sm shadow-inner";
+            return (
+                <div className={`flex flex-col gap-2 ${className}`}>
+                    {label && <label className="font-mono text-xs text-zinc-300 uppercase tracking-widest font-semibold">{label}</label>}
+                    {as === "select" ? (
+                        <select value={value} onChange={onChange} className={baseClass}>
+                            {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                    ) : as === "textarea" ? (
+                        <textarea value={value} onChange={onChange} placeholder={placeholder} className={`${baseClass} min-h-[100px] resize-y`} />
+                    ) : (
+                        <input type={type} value={value} onChange={onChange} placeholder={placeholder} className={baseClass} />
+                    )}
+                </div>
+            );
+        };
+
+        const Loader = ({ text = "Processing frame..." }) => (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                    <div className="absolute inset-0 border-2 border-zinc-700 rounded-full"></div>
+                    <div className="absolute inset-0 border-2 border-t-cinematic-amber border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                    <div className="w-2 h-2 bg-cinematic-red rounded-full animate-pulse"></div>
+                </div>
+                <p className="font-mono text-xs text-zinc-300 tracking-widest uppercase font-semibold">{text}</p>
+            </div>
+        );
+
+        const MarkdownDisplay = ({ content }) => {
+            const createMarkup = () => {
+                return { __html: marked.parse(content || '') };
+            };
+            return <div className="prose prose-invert max-w-none text-zinc-100" dangerouslySetInnerHTML={createMarkup()} />;
+        };
+
+        const useTypewriter = (text, speed = 50) => {
+            const [displayText, setDisplayText] = useState('');
+            useEffect(() => {
+                let i = 0;
+                setDisplayText('');
+                const timer = setInterval(() => {
+                    setDisplayText(text.substring(0, i + 1));
+                    i++;
+                    if (i >= text.length) clearInterval(timer);
+                }, speed);
+                return () => clearInterval(timer);
+            }, [text, speed]);
+            return displayText;
+        };
+
+        const Home = ({ setRoute }) => {
+            const fullText = "MAKE BETTER FRAMES.\nSHOOT BETTER STORIES.";
+            const typedText = useTypewriter(fullText, 70);
+
+            return (
+                <div className="animate-in fade-in duration-700">
+                    <div className="max-w-4xl mx-auto py-12 sm:py-20 text-center flex flex-col items-center min-h-[400px]">
+                        <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight text-white mb-6 leading-tight h-[100px] sm:h-[120px] md:h-[160px] flex items-center justify-center font-typewriter whitespace-pre-line">
+                            {typedText}
+                            <span className="animate-pulse text-cinematic-amber font-light">_</span>
+                        </h1>
+
+                        <p className="text-xl text-zinc-300 max-w-2xl mx-auto mb-12 font-normal">
+                            Professional AI tools for filmmakers, photographers, and visual storytellers. No fluff, just practical cinematic intelligence.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                            <CinematicButton className="w-full sm:w-auto" onClick={() => setRoute('critic')}>Critique My Frame</CinematicButton>
+                            <CinematicButton className="w-full sm:w-auto" variant="outline" onClick={() => setRoute('designer')}>Design a Shot</CinematicButton>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto mt-4 pb-24">
+                        {[
+                            { id: 'finder', title: '01 — Find Something to Watch', desc: 'AI-driven movie discovery based on mood, style, and cinematography.', icon: Icons.Video },
+                            { id: 'gear', title: '02 — Build Your Kit', desc: 'Honest gear recommendations and direct purchase links tailored to your budget (INR).', icon: Icons.Settings },
+                            { id: 'designer', title: '03 — Design Your Frame', desc: 'Translate emotions into exact focal lengths, lighting, and composition setups.', icon: Icons.Crosshair },
+                            { id: 'critic', title: '04 — Composition Critic', desc: 'Upload a frame for a brutal, professional critique of your composition and lighting.', icon: Icons.Eye },
+                        ].map(tool => (
+                            <div key={tool.id} onClick={() => setRoute(tool.id)} className="group cursor-pointer">
+                                <ViewfinderCard className="h-full transition-all hover:-translate-y-1 hover:shadow-md hover:bg-[#161619] hover:border-cinematic-amber">
+                                    <div className="text-zinc-300 mb-4 group-hover:text-cinematic-amber transition-colors"><tool.icon /></div>
+                                    <h3 className="text-lg font-bold text-white mb-2 font-mono uppercase tracking-wide">{tool.title}</h3>
+                                    <p className="text-zinc-300 text-sm leading-relaxed">{tool.desc}</p>
+                                </ViewfinderCard>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const MovieFinder = ({ runApiCall }) => {
+            const [params, setParams] = useState({ genre: 'Thriller', style: 'Cinematic', origin: 'Any', mood: '' });
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState('');
+
+            const genres = [
+                {label: 'Thriller', value: 'Thriller'}, {label: 'Drama', value: 'Drama'}, {label: 'Sci-Fi', value: 'Sci-Fi'}, 
+                {label: 'Romance', value: 'Romance'}, {label: 'Dry Humour', value: 'Dry Humour'}, {label: 'Adult', value: 'Adult'},
+                {label: 'Horror', value: 'Horror'}, {label: 'Heartfelt', value: 'Heartfelt'}, {label: 'Gothic', value: 'Gothic'},
+                {label: 'Comedy', value: 'Comedy'}, {label: 'Biopic', value: 'Biopic'}, {label: 'Musical', value: 'Musical'},
+                {label: 'Animation', value: 'Animation'}, {label: 'Documentary', value: 'Documentary'},
+                {label: 'Anime', value: 'Anime'}, {label: 'Family', value: 'Family'}, {label: 'Mystery', value: 'Mystery'}, {label: 'Adventure', value: 'Adventure'}
+            ];
+
+            const search = async () => {
+                setLoading(true);
+                const prompt = `Act as an expert film curator. I need a movie recommendation.
+Genre: ${params.genre}
+Origin/Industry: ${params.origin}
+Mood/Vibe: ${params.mood}
+
+Recommend EXACTLY ONE primary film that perfectly matches this.
+Format the response STRICTLY as follows using Markdown:
+1. Movie Name as Heading 2 (##)
+2. **Trailer:** [Watch Official Trailer on YouTube](https://www.youtube.com/results?search_query=MOVIE_NAME+official+trailer) (Replace MOVIE_NAME with the actual movie title encoded with plus signs)
+3. **Director:** [Name]
+4. **Producer:** [Name]
+5. **Cast:** [Names]
+6. **Year:** [Year]
+7. **Genre:** [Genre]
+8. **Duration:** [Duration]
+9. **Age Rating:** [Rating]
+10. **Summary:** A short 3-line summary of the plot without spoilers.
+11. **Why this suits your request:** Explain specifically why this film fits the prompt's mood, referencing cinematography and style.`;
+                
+                const res = await runApiCall(prompt);
+                setResult(res);
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto py-12 animate-in fade-in">
+                    <h2 className="text-2xl font-mono uppercase tracking-widest text-white mb-8 flex items-center gap-3 font-bold">
+                        <Icons.Video /> Movie Finder
+                    </h2>
+                    <ViewfinderCard className="mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <Input label="Genre" as="select" value={params.genre} onChange={e => setParams({...params, genre: e.target.value})} options={genres} />
+                            <Input label="Industry/Origin" as="select" value={params.origin} onChange={e => setParams({...params, origin: e.target.value})} 
+                                options={[{label: 'Any', value: 'Any'}, {label: 'Hollywood', value: 'Hollywood'}, {label: 'Bollywood/Hindi', value: 'Bollywood'}, {label: 'Malayalam (Mollywood)', value: 'Malayalam'}, {label: 'Tamil (Kollywood)', value: 'Tamil'}, {label: 'International/Art House', value: 'International'}, {label: 'Korean', value: 'Korean'}, {label: 'Indie', value: 'Indie'}, {label: 'Short Film', value: 'Short Film'}]} />
+                        </div>
+                        <Input label="Describe the mood or specific visual style" as="textarea" placeholder="e.g., A slow, unsettling film with incredible cinematography, muted colors, and very little dialogue." 
+                            value={params.mood} onChange={e => setParams({...params, mood: e.target.value})} className="mb-6" />
+                        <CinematicButton onClick={search} disabled={loading || !params.mood}>
+                            {loading ? 'Searching Archives...' : 'Find Films'}
+                        </CinematicButton>
+                    </ViewfinderCard>
+                    
+                    {loading && <Loader text="Analyzing cinematic metadata..." />}
+                    {result && !loading && (
+                        <div className="bg-[#121215] border border-zinc-700 p-8 shadow-md">
+                            <MarkdownDisplay content={result} />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const GearAdvisor = ({ mode, runApiCall }) => {
+            const [params, setParams] = useState({ category: 'Complete Kit', budget: '50000', level: 'Beginner', useCase: 'Short Films', preferredBrand: 'Anything', priorities: '' });
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState('');
+
+            const categories = [
+                {label: 'Complete Kit', value: 'Complete Kit'},
+                {label: 'Camera Body', value: 'Camera Body'},
+                {label: 'Lenses', value: 'Lenses'},
+                {label: 'Lighting', value: 'Lighting'},
+                {label: 'Microphones/Audio', value: 'Microphones'},
+                {label: 'Accessories/Support', value: 'Accessories'},
+                {label: 'Mobile Phone Gear', value: 'Mobile Phone Gear'},
+                {label: 'Cables', value: 'Cables'},
+                {label: 'Gimbals', value: 'Gimbals'},
+                {label: 'Softboxes', value: 'Softboxes'},
+                {label: 'Filters', value: 'Filters'},
+                {label: 'Drones', value: 'Drones'}
+            ];
+
+            const advise = async () => {
+                setLoading(true);
+                const prompt = `Act as a brutally honest professional gear advisor in India.
+Target Gear Category: ${params.category}
+My Mode: ${mode} (If Film, recommend video-centric gear. If Photo, recommend photo-centric gear).
+Budget: ₹${params.budget} INR.
+My Level: ${params.level}.
+Primary Use Case: ${params.useCase}.
+Preferred Brand: ${params.preferredBrand}.
+ADAPT YOUR RECOMMENDATION TO THE USER'S EXACT MODE, CATEGORY, PRIMARY USE CASE, AND PREFERRED BRAND. Treat those selections as hard context for the recommendation, not optional hints. Distinguish film/video workflows from photo workflows, and tailor accessory recommendations to the selected category and intended use. If a specific preferred brand is selected, prioritize suitable options from that brand where it makes practical sense; if 'Anything' is selected, choose the best-value options across brands.
+Other priorities: ${params.priorities}.
+
+CRITICAL CONSTRAINT: Prioritize practical, accessible consumer and prosumer gear from trusted brands like Sony, Canon, Nikon, Fujifilm, Sigma, Tamron, and DJI. Avoid recommending ultra-luxury cinema equipment (like Arri, RED, or Cooke). Focus on value-for-money options suitable for indie creators in India.
+
+Provide a recommendation for the requested category. 
+Be specific about models available in India. Estimate prices in INR.
+Include specific purchase links using markdown format [Store Name](URL). Link to Amazon India, Flipkart, or authorized regional dealers. If exact link is unknown, provide a search query link (e.g., [Amazon Search](https://www.amazon.in/s?k=model+name)).
+Also, briefly tell me what NOT to buy or common mistakes for this category and budget.`;
+                
+                const res = await runApiCall(prompt);
+                setResult(res);
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto py-12 animate-in fade-in">
+                     <h2 className="text-2xl font-mono uppercase tracking-widest text-white mb-8 flex items-center gap-3 font-bold">
+                        <Icons.Settings /> Gear Advisor ({mode})
+                    </h2>
+                    <ViewfinderCard className="mb-8">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                            <Input label="Category" as="select" value={params.category} onChange={e => setParams({...params, category: e.target.value})} options={categories} />
+                            <Input label="Budget (INR)" type="number" value={params.budget} onChange={e => setParams({...params, budget: e.target.value})} placeholder="e.g. 150000" />
+                            <Input label="Experience" as="select" value={params.level} onChange={e => setParams({...params, level: e.target.value})} 
+                                options={[{label: 'Beginner', value: 'Beginner'}, {label: 'Intermediate', value: 'Intermediate'}, {label: 'Pro', value: 'Pro'}]} />
+                            <Input label="Primary Use" as="select" value={params.useCase} onChange={e => setParams({...params, useCase: e.target.value})} 
+                                options={mode === 'film' ? 
+                                    [{label: 'Short Films', value: 'Short Films'}, {label: 'YouTube', value: 'YouTube'}, {label: 'Documentary', value: 'Documentary'}, {label: 'Music Video', value: 'Music Video'}, {label: 'Biopic', value: 'Biopic'}, {label: 'Interview', value: 'Interview'}, {label: 'Podcast', value: 'Podcast'}, {label: 'Event', value: 'Event'}] : 
+                                    [{label: 'Street', value: 'Street'}, {label: 'Travel', value: 'Travel'}, {label: 'Portrait', value: 'Portrait'}, {label: 'Landscape', value: 'Landscape'}, {label: 'Macro', value: 'Macro'}, {label: 'Sports', value: 'Sports'}, {label: 'Wildlife', value: 'Wildlife'}, {label: 'Events', value: 'Events'}, {label: 'Astro', value: 'Astro'}, {label: 'Underwater', value: 'Underwater'}, {label: 'Abstract', value: 'Abstract'}]} />
+                            <Input label="Preferred Brand" as="select" value={params.preferredBrand} onChange={e => setParams({...params, preferredBrand: e.target.value})} 
+                                options={[
+                                    {label: 'Anything', value: 'Anything'}, {label: 'Canon', value: 'Canon'}, {label: 'Sony', value: 'Sony'}, {label: 'Nikon', value: 'Nikon'}, {label: 'Pentax', value: 'Pentax'}, {label: 'Fujifilm', value: 'Fujifilm'}, {label: 'DJI', value: 'DJI'}, {label: 'Gimbal', value: 'Gimbal'}, {label: 'Arri', value: 'Arri'}, {label: 'RED', value: 'RED'}, {label: 'Hassleblad', value: 'Hassleblad'}, {label: 'Samsung', value: 'Samsung'}, {label: 'Nothing', value: 'Nothing'}, {label: 'Apple', value: 'Apple'}, {label: 'Oneplus', value: 'Oneplus'}, {label: 'Redmi', value: 'Redmi'}, {label: 'Oneplus', value: 'Oneplus'}, {label: 'PIxel', value: 'PIxel'}, {label: 'Xiaomi', value: 'Xiaomi'}, {label: 'Digitek', value: 'Digitek'}, {label: 'Lieca', value: 'Lieca'}, {label: 'Kodak', value: 'Kodak'}, {label: 'Sigma', value: 'Sigma'}, {label: 'Blackmagic', value: 'Blackmagic'}, {label: 'Zeiss', value: 'Zeiss'}, {label: 'Olympus', value: 'Olympus'}, {label: 'Hiffin', value: 'Hiffin'}, {label: 'Godox', value: 'Godox'}, {label: 'Samyang', value: 'Samyang'}, {label: 'Tamron', value: 'Tamron'}
+                                ]} />
+                        </div>
+                        <Input label="Specific priorities or existing gear" as="textarea" placeholder="e.g., I need good low light, I already have a 50mm Canon lens..." 
+                            value={params.priorities} onChange={e => setParams({...params, priorities: e.target.value})} className="mb-6" />
+                        <CinematicButton onClick={advise} disabled={loading || !params.budget}>
+                            {loading ? 'Evaluating market options...' : 'Find Gear'}
+                        </CinematicButton>
+                    </ViewfinderCard>
+
+                    {loading && <Loader text="Calculating optics and acoustics..." />}
+                    {result && !loading && (
+                        <div className="bg-[#121215] border border-zinc-700 p-8 border-t-4 border-t-cinematic-amber shadow-md">
+                            <MarkdownDisplay content={result} />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const FrameDesigner = ({ mode, runApiCall }) => {
+            const [emotion, setEmotion] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState('');
+
+            const design = async () => {
+                setLoading(true);
+                const prompt = `Act as a master cinematographer/photographer. 
+I want to design a frame that makes the audience feel: "${emotion}".
+Target Medium: ${mode}.
+
+CRITICAL PRIORITY: Make the emotional intention, composition, framing, lighting, and editing guidance the core of the answer. Spend substantially less space on gear. Gear should still be listed as practical supporting recommendations, never as the main focus.
+
+When suggesting camera bodies, lenses, or equipment setups, prioritize affordable, consumer and prosumer gear (e.g., Sony mirrorless, Canon EOS R series, Nikon Z series, Sigma/Tamron budget primes, or vintage adapted lenses) rather than elite Hollywood cinema gear (Arri, RED, Cooke).
+
+Recommend specific, practical choices to achieve this feeling, with the creative decisions first:
+1. Emotional/Story Intent — explain how the frame should make the audience feel and what visual choices create that response.
+2. Composition & Framing Strategy — blocking, negative space, visual hierarchy, lines, subject placement, and framing choices.
+3. Lighting Strategy — direction, quality, contrast, color, motivated sources, and practical ways to shape the mood.
+4. Editing/Post-Production Tips — pacing, shot selection, transitions, color, contrast, and how editing reinforces the emotion.
+5. Camera Angle & Height.
+6. ${mode === 'film' ? 'Camera Movement' : 'Aperture/Shutter Speed starting points'}.
+7. Lens/Focal Length (e.g., 35mm f/1.8 or 50mm prime) and why.
+8. Camera Body & Setup recommendations (budget-friendly consumer/prosumer tiers).
+9. A concise Suggested Gear list that supports the above creative choices without dominating the response.
+Explain the psychology behind the creative and technical choices clearly.`;
+                
+                const res = await runApiCall(prompt);
+                setResult(res);
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto py-12 animate-in fade-in">
+                     <h2 className="text-2xl font-mono uppercase tracking-widest text-white mb-8 flex items-center gap-3 font-bold">
+                        <Icons.Crosshair /> Frame Designer
+                    </h2>
+                    <ViewfinderCard className="mb-8">
+                        <Input label="What should the audience feel?" placeholder="e.g., Claustrophobic, isolated, dominant, romantic, uneasy..." 
+                            value={emotion} onChange={e => setEmotion(e.target.value)} className="mb-6 text-lg" />
+                        <CinematicButton onClick={design} disabled={loading || !emotion}>
+                            {loading ? 'Visualizing frame...' : 'Design Shot'}
+                        </CinematicButton>
+                    </ViewfinderCard>
+
+                    {loading && <Loader text="Selecting focal lengths..." />}
+                    {result && !loading && (
+                        <div className="bg-[#121215] border border-zinc-700 p-8 shadow-md">
+                            <MarkdownDisplay content={result} />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const CompositionCritic = ({ runApiCall }) => {
+            const [image, setImage] = useState(null); 
+            const [previewUrl, setPreviewUrl] = useState(null);
+            const [intent, setIntent] = useState('');
+            const [critiqueMode, setCritiqueMode] = useState('honest');
+            const [loading, setLoading] = useState(false);
+            const [result, setResult] = useState('');
+            const fileInputRef = useRef(null);
+
+            useEffect(() => {
+                return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }
+            }, [previewUrl]);
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                setPreviewUrl(URL.createObjectURL(file));
+
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImage({ base64: reader.result, mimeType: file.type });
+                    setResult(''); 
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const removeImage = () => {
+                setImage(null); setPreviewUrl(null); setResult('');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            };
+
+            const analyze = async () => {
+                if (!image) return;
+                setLoading(true);
+                
+                const styleInstruction = critiqueMode === 'brutal' 
+                    ? "MODE: BRUTAL. Do not sugarcoat anything. Tear this frame apart constructively. Point out every distracting element, poor lighting choice, or weak composition." 
+                    : "MODE: HONEST PROFESSIONAL. Give a balanced, constructive critique as an experienced mentor.";
+
+                const prompt = `${styleInstruction}
+Analyze this frame. User's Intent: ${intent || 'Not specified. Evaluate general visual impact.'}
+Structure your response:
+1. VERDICT & SCORE (out of 10)
+2. TECHNICAL ANALYSIS (Exposure, Focus, Lighting quality, Lens distortion)
+3. CREATIVE ANALYSIS (Composition, Storytelling, Visual Hierarchy)
+4. THE BIGGEST DISTRACTION
+5. HOW I WOULD RESHOOT IT (Specific lens, angle, lighting suggestions)`;
+
+                const res = await runApiCall(prompt, image.base64, image.mimeType);
+                setResult(res);
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-5xl mx-auto py-12 animate-in fade-in">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+                        <div>
+                            <h2 className="text-2xl font-mono uppercase tracking-widest text-white flex items-center gap-3 mb-2 font-bold">
+                                <Icons.Eye /> Composition Critic
+                            </h2>
+                            <p className="text-zinc-300 text-sm">Strictly private. Images are analyzed in-memory and discarded.</p>
+                        </div>
+                        <div className="flex gap-2 bg-zinc-900 p-1 rounded-sm border border-zinc-700 shadow-sm">
+                            <button onClick={() => setCritiqueMode('honest')} className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider font-bold transition-colors ${critiqueMode === 'honest' ? 'bg-zinc-100 text-zinc-950' : 'text-zinc-300 hover:text-white'}`}>Honest</button>
+                            <button onClick={() => setCritiqueMode('brutal')} className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider font-bold transition-colors ${critiqueMode === 'brutal' ? 'bg-red-700 text-white' : 'text-zinc-300 hover:text-red-400'}`}>Brutal</button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="flex flex-col gap-4">
+                            {!previewUrl ? (
+                                <div 
+                                    className="border-2 border-dashed border-zinc-700 hover:border-cinematic-amber bg-[#121215] h-[400px] flex flex-col items-center justify-center cursor-pointer transition-colors shadow-sm"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Icons.Upload />
+                                    <p className="mt-4 font-mono text-sm text-zinc-200 font-semibold">Click to upload frame</p>
+                                    <p className="mt-2 text-xs text-zinc-400">JPG, PNG, WEBP</p>
+                                </div>
+                            ) : (
+                                <div className="relative group shadow-md">
+                                    <img src={previewUrl} alt="Preview" className="w-full h-auto object-contain border border-zinc-700 max-h-[600px] bg-zinc-950" />
+                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => fileInputRef.current?.click()} className="bg-zinc-900 text-zinc-100 px-3 py-1.5 text-xs font-mono uppercase hover:text-cinematic-amber border border-zinc-700">Replace</button>
+                                        <button onClick={removeImage} className="bg-zinc-900 text-zinc-100 px-3 py-1.5 text-xs font-mono uppercase hover:text-cinematic-red border border-zinc-700">Remove</button>
+                                    </div>
+                                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none border border-zinc-500/20 grid grid-cols-3 grid-rows-3 opacity-30">
+                                        <div className="border-r border-b border-zinc-700"></div><div className="border-r border-b border-zinc-700"></div><div className="border-b border-zinc-700"></div>
+                                        <div className="border-r border-b border-zinc-700"></div><div className="border-r border-b border-zinc-700"></div><div className="border-b border-zinc-700"></div>
+                                        <div className="border-r border-zinc-700"></div><div className="border-r border-zinc-700"></div><div></div>
+                                    </div>
+                                </div>
+                            )}
+                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/jpeg, image/png, image/webp" className="hidden" />
+                            
+                            <Input label="What were you trying to achieve? (Optional)" as="textarea" placeholder="e.g., I wanted the subject to look isolated, but the background feels too messy." 
+                                value={intent} onChange={e => setIntent(e.target.value)} disabled={!previewUrl} />
+                            
+                            <CinematicButton onClick={analyze} disabled={loading || !previewUrl} variant={critiqueMode === 'brutal' ? 'danger' : 'primary'}>
+                                {loading ? 'Analyzing Pixels...' : 'Critique Frame'}
+                            </CinematicButton>
+                        </div>
+
+                        <div className="bg-[#121215] border border-zinc-700 p-6 min-h-[400px] shadow-md">
+                            {loading ? (
+                                <Loader text="Evaluating composition and light..." />
+                            ) : result ? (
+                                <div className={`prose prose-invert max-w-none ${critiqueMode === 'brutal' ? 'prose-h2:text-cinematic-red' : ''}`}>
+                                    <MarkdownDisplay content={result} />
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-zinc-400 font-mono text-sm text-center">
+                                    <Icons.Eye />
+                                    <p className="mt-4 font-semibold text-zinc-200">Upload a frame and request a critique.</p>
+                                    <p className="mt-2 text-xs opacity-75">Requires a trained eye.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Scriptwriter = ({ runApiCall }) => {
+            const [mode, setMode] = useState('rate');
+            const [input, setInput] = useState('');
+            const [messages, setMessages] = useState([]);
+            const [loading, setLoading] = useState(false);
+
+            const sendMessage = async () => {
+                const text = input.trim();
+                if (!text || loading) return;
+
+                setInput('');
+                setMessages(prev => [...prev, { role: 'user', text }]);
+                setLoading(true);
+
+                const prompt = mode === 'rate'
+                    ? `You are a professional screenwriter, script consultant, and story editor. Rate and assess the following story/script. Be honest, specific, and constructive. Focus on premise, structure, character motivation, dialogue, pacing, emotional impact, originality, visual potential, and ending. Give an overall score out of 10 and clear actionable improvements. Do not rewrite the entire script unless specifically asked.
+
+STORY/SCRIPT:
+${text}`
+                    : `You are an expert screenwriter and story-development partner. Help the user brainstorm a compelling film/story. Ask useful follow-up questions when needed, develop premise, characters, conflict, stakes, structure, themes, twists, scenes, and emotional arcs. Keep the ideas cinematic and practical. Build on the user's ideas rather than replacing them, and be collaborative rather than generic.
+
+USER IDEA / REQUEST:
+${text}`;
+
+                const res = await runApiCall(prompt);
+                setMessages(prev => [...prev, { role: 'assistant', text: res }]);
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto py-12 animate-in fade-in">
+                    <h2 className="text-2xl font-mono uppercase tracking-widest text-white mb-8 flex items-center gap-3 font-bold">
+                        <span className="text-cinematic-amber">✎</span> Scriptwriter
+                    </h2>
+
+                    <ViewfinderCard className="mb-8">
+                        <div className="flex gap-2 bg-zinc-900 border border-zinc-700 rounded-sm p-1 w-fit mb-6 shadow-sm">
+                            <button onClick={() => setMode('rate')} className={`px-4 py-2 text-xs font-mono uppercase tracking-wider font-bold transition-colors ${mode === 'rate' ? 'bg-zinc-100 text-zinc-950 shadow-sm' : 'text-zinc-300 hover:text-white'}`}>Rate My Script</button>
+                            <button onClick={() => setMode('brainstorm')} className={`px-4 py-2 text-xs font-mono uppercase tracking-wider font-bold transition-colors ${mode === 'brainstorm' ? 'bg-zinc-100 text-zinc-950 shadow-sm' : 'text-zinc-300 hover:text-white'}`}>Brainstorm a Story</button>
+                        </div>
+
+                        <Input
+                            label={mode === 'rate' ? 'Paste your story or script' : 'Tell me your story idea'}
+                            as="textarea"
+                            placeholder={mode === 'rate' ? 'Paste a scene, synopsis, treatment, or script excerpt...' : 'Start with a premise, character, emotion, setting, or even a single sentence...'}
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            className="mb-6"
+                        />
+                        <CinematicButton onClick={sendMessage} disabled={loading || !input.trim()}>
+                            {loading ? 'Writing...' : mode === 'rate' ? 'Rate Story' : 'Brainstorm'}
+                        </CinematicButton>
+                    </ViewfinderCard>
+
+                    {messages.length > 0 && (
+                        <div className="space-y-4">
+                            {messages.map((message, index) => (
+                                <div key={index} className={`p-6 border shadow-md ${message.role === 'user' ? 'bg-zinc-900 border-zinc-700' : 'bg-[#121215] border-zinc-700 border-l-4 border-l-cinematic-amber'}`}>
+                                    <div className="font-mono text-xs uppercase tracking-widest text-zinc-400 mb-3 font-bold">{message.role === 'user' ? 'You' : 'Scriptwriter'}</div>
+                                    {message.role === 'assistant' ? <MarkdownDisplay content={message.text} /> : <p className="text-zinc-200 whitespace-pre-wrap leading-relaxed">{message.text}</p>}
+                                </div>
+                            ))}
+                            {loading && <Loader text={mode === 'rate' ? 'Reading the script...' : 'Developing the story...'} />}
+                        </div>
+                    )}
+
+                    <p className="text-center text-[11px] text-zinc-500 font-mono tracking-wide mt-8">This session is temporary; nothing is stored.</p>
+                </div>
+            );
+        };
+
+        const Credits = () => (
+            <div className="max-w-3xl mx-auto py-20 animate-in fade-in">
+                <ViewfinderCard className="text-center shadow-lg">
+                    <h2 className="text-3xl font-mono uppercase tracking-widest text-white mb-8 font-bold">Credits</h2>
+                    
+                    <div className="prose prose-invert mx-auto">
+                        <p className="text-xl text-zinc-100">Built by <strong className="text-white">Abir D.W</strong></p>
+                        <p className="text-lg mt-4 text-zinc-300">
+                            Director of <br/>
+                            <a href="https://youtu.be/qDCI4din63U?si=37jmDYPW18wrXSuM" target="_blank" rel="noopener noreferrer" className="font-bold font-typewriter text-cinematic-amber text-2xl no-underline hover:opacity-80 transition-opacity">
+                                Contract on God
+                            </a>
+                        </p>
+                        
+                        <div className="mt-12 pt-8 border-t border-zinc-700">
+                            <a href="https://www.instagram.com/not_abir_at_all" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-700 rounded-sm bg-zinc-900 text-zinc-100 font-bold hover:bg-zinc-800 transition-colors no-underline shadow-sm">
+                                <Icons.User /> Follow on Instagram
+                            </a>
+                            <a href="https://www.youtube.com/@StutterFrameProductions" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-6 py-3 border border-zinc-700 rounded-sm bg-zinc-900 text-zinc-100 font-bold hover:bg-zinc-800 transition-colors no-underline shadow-sm ml-3">
+                                YouTube Channel
+                            </a>
+                        </div>
+                    </div>
+                </ViewfinderCard>
+            </div>
+        );
+
+        const App = () => {
+            const [route, setRoute] = useState('home');
+            const [mode, setMode] = useState('film'); 
+            const [apiUsage, setApiUsage] = useState(0);
+            const [resetTimer, setResetTimer] = useState(60);
+            const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setResetTimer(prev => {
+                        if (prev <= 1) {
+                            setApiUsage(0);
+                            return 60;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            const runApiCall = async (prompt, imageBase64 = null, mimeType = "image/jpeg") => {
+                if (apiUsage >= MAX_REQUESTS_PER_MINUTE) {
+                    return `**Rate Limit Exceeded:** The AI is resting. Please wait ${resetTimer} seconds for the limit to reset.`;
+                }
+                
+                setApiUsage(prev => prev + 1);
+
+                const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+                const delays = [1000, 2000, 4000];
+                
+                let payload = {
+                    systemInstruction: { parts: [{ text: PERSONA }] },
+                    contents: []
+                };
+
+                if (imageBase64) {
+                    const cleanBase64 = imageBase64.split(',')[1] || imageBase64;
+                    payload.contents = [{
+                        role: "user",
+                        parts: [ { text: prompt }, { inlineData: { mimeType: mimeType, data: cleanBase64 } } ]
+                    }];
+                } else {
+                    payload.contents = [{ parts: [{ text: prompt }] }];
+                }
+
+                for (let attempt = 0; attempt <= delays.length; attempt++) {
+                    try {
+                        const response = await fetch(`${API_URL}?key=${apiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            const err = await response.json();
+                            throw new Error(err.error?.message || `HTTP ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+                    } catch (error) {
+                        if (attempt === delays.length) {
+                            console.error("Gemini API Error:", error);
+                            return `**System Error:** Communication with the visual assistant failed.\n\n*Details: ${error.message}*`;
+                        }
+                        await sleep(delays[attempt]);
+                    }
+                }
+            };
+
+            const renderRoute = () => {
+                switch(route) {
+                    case 'home': return <Home setRoute={setRoute} />;
+                    case 'finder': return <MovieFinder runApiCall={runApiCall} />;
+                    case 'gear': return <GearAdvisor mode={mode} runApiCall={runApiCall} />;
+                    case 'designer': return <FrameDesigner mode={mode} runApiCall={runApiCall} />;
+                    case 'critic': return <CompositionCritic runApiCall={runApiCall} />;
+                    case 'scriptwriter': return <Scriptwriter runApiCall={runApiCall} />;
+                    case 'credits': return <Credits />;
+                    default: return <Home setRoute={setRoute} />;
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans selection:bg-cinematic-amber/30 selection:text-amber-200">
+                    <nav className="border-b border-zinc-800 bg-[#0c0c0e]/95 backdrop-blur-md sticky top-0 z-40 transition-colors duration-300 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="font-mono font-bold text-white tracking-widest uppercase cursor-pointer flex items-center gap-2" onClick={() => { setRoute('home'); setMobileMenuOpen(false); }}>
+                                    <div className="w-2.5 h-2.5 bg-cinematic-amber rounded-full"></div>
+                                    <span className="hidden sm:inline">Visual Assistant</span>
+                                </div>
+                                <div className="hidden md:flex gap-6">
+                                    {[
+                                        {id: 'finder', label: 'Films'},
+                                        {id: 'gear', label: 'Gear'},
+                                        {id: 'designer', label: 'Designer'},
+                                        {id: 'critic', label: 'Critic'},
+                                        {id: 'scriptwriter', label: 'Scriptwriter'}
+                                    ].map(item => (
+                                        <button key={item.id} onClick={() => { setRoute(item.id); setMobileMenuOpen(false); }} 
+                                            className={`text-sm font-mono uppercase tracking-wider font-semibold transition-colors ${route === item.id ? 'text-cinematic-amber font-bold underline underline-offset-8' : 'text-zinc-300 hover:text-white'}`}>
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono tracking-widest uppercase text-zinc-300 bg-zinc-900 px-3 py-1.5 rounded-sm border border-zinc-700 font-bold whitespace-nowrap shadow-sm">
+                                    <Icons.Zap />
+                                    <span>{MAX_REQUESTS_PER_MINUTE - apiUsage} left</span>
+                                    <span className="text-zinc-500">({resetTimer}s)</span>
+                                </div>
+
+                                {route === 'gear' && (
+                                    <div className="flex bg-zinc-900 border border-zinc-700 rounded-sm p-1 shadow-sm">
+                                        <button onClick={() => setMode('film')} className={`px-3 py-1 text-xs font-mono font-bold uppercase transition-colors ${mode === 'film' ? 'bg-zinc-100 text-zinc-950 shadow-sm' : 'text-zinc-300'}`}>Film</button>
+                                        <button onClick={() => setMode('photo')} className={`px-3 py-1 text-xs font-mono font-bold uppercase transition-colors ${mode === 'photo' ? 'bg-zinc-100 text-zinc-950 shadow-sm' : 'text-zinc-300'}`}>Photo</button>
+                                    </div>
+                                )}
+
+                                <button onClick={() => { setRoute('credits'); setMobileMenuOpen(false); }} className="text-zinc-300 hover:text-white p-2 transition-colors" title="Credits">
+                                    <Icons.User />
+                                </button>
+
+                                <button
+                                    onClick={() => setMobileMenuOpen(prev => !prev)}
+                                    className="md:hidden text-zinc-300 hover:text-white p-2 transition-colors"
+                                    title="Menu"
+                                    aria-label="Toggle navigation menu"
+                                    aria-expanded={mobileMenuOpen}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        {mobileMenuOpen ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></> : <><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></>}
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        {mobileMenuOpen && (
+                            <div className="md:hidden border-t border-zinc-800 bg-[#0c0c0e]/98 px-4 py-3">
+                                <div className="flex flex-col gap-1">
+                                    {[
+                                        {id: 'finder', label: 'Films'},
+                                        {id: 'gear', label: 'Gear'},
+                                        {id: 'designer', label: 'Designer'},
+                                        {id: 'critic', label: 'Critic'},
+                                        {id: 'scriptwriter', label: 'Scriptwriter'}
+                                    ].map(item => (
+                                        <button key={item.id} onClick={() => { setRoute(item.id); setMobileMenuOpen(false); }}
+                                            className={`w-full text-left px-3 py-3 text-sm font-mono uppercase tracking-wider font-semibold transition-colors ${route === item.id ? 'text-cinematic-amber bg-zinc-900 font-bold' : 'text-zinc-300 hover:text-white hover:bg-zinc-900/70'}`}>
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </nav>
+
+                    <main className="flex-grow px-4 md:px-8 relative z-10">
+                        {renderRoute()}
+                    </main>
+
+                    <footer className="border-t border-zinc-800 py-8 text-center text-zinc-400 font-mono text-xs uppercase tracking-widest mt-auto font-semibold bg-[#09090b]/50">
+                        <p>Built for Visual Storytellers</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
